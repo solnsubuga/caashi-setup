@@ -1,0 +1,59 @@
+name: Caashi setup
+description: Observe every run step and reuse results a trusted run already verified. Shadow mode first; never fails your job.
+author: Caashi
+branding:
+  icon: layers
+  color: green
+
+inputs:
+  mode:
+    description: >-
+      auto (the repository's mode from Caashi), shadow (observe only, even if
+      the repository is in enforce mode), or off (do nothing).
+    default: auto
+  server-url:
+    description: Caashi API base URL.
+    default: https://api.fidiba.dev
+  audience:
+    description: Audience of the GitHub OIDC token sent to Caashi.
+    default: caashi
+  shim:
+    description: Put the bash and sh shims on PATH so run steps go through the agent.
+    default: "true"
+  upload-deadline-seconds:
+    description: How long the post step waits for result uploads before giving up.
+    default: "60"
+  secrets:
+    description: >-
+      The job's secrets as JSON: set it to the toJSON(secrets) expression
+      (see the README). Caashi keeps the values in its agent's memory only,
+      to key steps that use them and to never store or replay a result whose
+      logs or outputs contain one. Without it, results from this job are
+      marked unchecked and are never reused by fork pull requests.
+    default: ""
+  agent-version:
+    description: Agent release to use. Defaults to the one this Action pins.
+    default: ""
+  agent-sha256:
+    description: SHA-256 of the agent archive. Required for a version this Action does not pin.
+    default: ""
+  agent-url:
+    description: Download URL template for the agent archive, with {version} and {arch}.
+    default: ""
+  agent-path:
+    description: Use an agent binary already on the runner instead of downloading one.
+    default: ""
+
+outputs:
+  enabled:
+    description: '"true" when Caashi is active for this job.'
+  mode:
+    description: shadow, enforce, or off.
+  session-id:
+    description: The Caashi session for this job.
+
+runs:
+  using: node24
+  main: dist/main.mjs
+  post: dist/post.mjs
+  post-if: always()

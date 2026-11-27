@@ -1,0 +1,34 @@
+name: Caashi plan
+description: Skip pull request jobs that the change cannot reach, before a runner starts. Any doubt runs the job.
+author: Caashi
+branding:
+  icon: fast-forward
+  color: green
+
+inputs:
+  server-url:
+    description: Caashi API base URL.
+    default: https://api.fidiba.dev
+  token:
+    description: >-
+      A GitHub token that can read the repository. The job's own token is
+      enough; Caashi only uses it to check that the caller can read the
+      repository.
+    default: ${{ github.token }}
+  workflow:
+    description: >-
+      The workflow file to plan, such as .github/workflows/ci.yml. Defaults
+      to the workflow this job is part of.
+    default: ""
+
+outputs:
+  skip:
+    description: >-
+      JSON array of the job ids this pull request may skip. Use it in each
+      planned job: if: ${{ !contains(fromJSON(needs.plan.outputs.skip), 'build') }}
+  run:
+    description: JSON array of the job ids that must run.
+
+runs:
+  using: node24
+  main: dist/plan.mjs
