@@ -24056,7 +24056,9 @@ function parseUnits(stdout) {
     audit_mismatch: (u.audit_mismatch ?? u.auditMismatch) === true,
     test_group: s(u.test_group ?? u.testGroup),
     test_runner: s(u.test_runner ?? u.testRunner),
-    test_file: s(u.test_file ?? u.testFile)
+    test_file: s(u.test_file ?? u.testFile),
+    source_sha: s(u.source_sha ?? u.sourceSha),
+    source_ref: s(u.source_ref ?? u.sourceRef)
   }));
 }
 function identicalMs(u) {
@@ -24190,7 +24192,7 @@ function renderSummary(units, o) {
   lines.push(`### Caashi: ${percent(t)}% of this job was identical to verified work`, "");
   if (shadow) {
     lines.push(
-      `**Shadow mode.** Every step ran. ${fmtDuration(t.ms_identical)} of ${fmtDuration(t.ms_total)} of step time matched results a trusted run had already verified, so it could have been skipped.`
+      `**Shadow mode.** Every step ran. ${fmtDuration(t.ms_identical)} of ${fmtDuration(t.ms_total)} of step time matched results a trusted run had already verified, so it could have been reused.`
     );
   } else {
     lines.push(
@@ -24235,7 +24237,7 @@ function renderSummary(units, o) {
     const label = u.audit_mismatch ? "audit mismatch" : LABELS[u.decision]?.[shadow ? 0 : 1] ?? cell(u.decision);
     const ms = identicalMs(u);
     const identical = ms > 0 ? fmtDuration(ms) : "-";
-    const why = u.first_diff_input || u.reason;
+    const why = u.first_diff_input || reusedFrom(u) || u.reason;
     lines.push(
       `| ${cell(u.label || u.step || "(unnamed step)")} | ${label} | ${fmtDuration(u.duration_ms)} | ${identical} | ${why ? "`" + cell(why) + "`" : ""} |`
     );
@@ -24243,6 +24245,39 @@ function renderSummary(units, o) {
   if (rows.length > max) lines.push("", `_${rows.length - max} more steps not shown._`);
   if (o.reportUrl) lines.push("", `[Full report](${o.reportUrl})`);
   return lines.join("\n") + "\n";
+}
+function reusedFrom(u) {
+  if (u.audit_mismatch || !["hit", "would_hit", "audited"].includes(u.decision)) return "";
+  const sha = (u.source_sha ?? "").slice(0, 7);
+  if (!sha) return "";
+  const ref = (u.source_ref ?? "").replace(/^refs\/(heads|tags)\//, "");
+  return `verified result from ${sha}${ref ? ` on ${ref}` : ""}`;
+}
+var MAX_NOTICES = 9;
+function reusedNotices(units, mode) {
+  if (mode !== "enforce") return [];
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  let more = 0;
+  for (const u of units) {
+    if (u.decision !== "hit" || u.audit_mismatch) continue;
+    const key = u.test_group ? `${u.step}\0${u.test_group}` : "";
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    if (out.length >= MAX_NOTICES) {
+      more++;
+      continue;
+    }
+    const from = reusedFrom(u) || "verified result from a trusted run";
+    if (key) {
+      const suite = (u.step || "tests") + (u.test_runner ? ` (${u.test_runner})` : "");
+      out.push(`Reused unchanged test files in "${suite}": ${from}.`);
+    } else {
+      out.push(`Reused "${u.label || u.step || "(unnamed step)"}": ${from}, saved ${fmtDuration(u.saved_ms)}.`);
+    }
+  }
+  if (more > 0) out.push(`Reused ${more} more ${more === 1 ? "step" : "steps"}. See the job summary for each one.`);
+  return out;
 }
 
 // src/setup.ts
@@ -24293,6 +24328,7 @@ async function finish(d) {
       core.warning(`Caashi could not close its session (${err instanceof Error ? err.message : String(err)}).`);
     }
     await core.writeSummary(renderSummary(units, { mode, reportUrl }));
+    for (const n of reusedNotices(units, mode)) core.notice(n);
   } finally {
     const stop = await runAgent(agent, ["stop", "--socket", socket], 1e4, d.env);
     if (stop.code !== 0) killQuietly(Number(core.getState(STATE.pid)) || void 0);

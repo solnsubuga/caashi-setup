@@ -35,4 +35,4 @@ else it turns itself off with a warning and steps run as normal.
   refuses it unless its SHA-256 matches.
 
 This repository is published automatically from Caashi's source on every
-change; pull requests here are not merged. Commit `a8a1cc8d2e30c266bc4de850215fba7bc6aa774f`.
+change; pull requests here are not merged. Commit `76b57364ea05bd121ccc823ba44add229783c1d3`.
