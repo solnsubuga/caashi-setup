@@ -24185,6 +24185,7 @@ function detectPlatform(platform2, arch3) {
 }
 
 // src/session.ts
+import { availableParallelism } from "node:os";
 var SessionError = class extends Error {
   constructor(message, status) {
     super(message);
@@ -24305,7 +24306,7 @@ async function openSession(serverUrl, oidcToken, job, opts = {}) {
   );
   return parseSession(raw);
 }
-function jobContext(env, agentVersion) {
+function jobContext(env, agentVersion, cpus = availableParallelism()) {
   const e = (k) => env[k] ?? "";
   const digits = (k) => /^\d+$/.test(e(k)) ? e(k) : void 0;
   const attempt = digits("GITHUB_RUN_ATTEMPT");
@@ -24320,6 +24321,7 @@ function jobContext(env, agentVersion) {
     event_name: e("GITHUB_EVENT_NAME"),
     runner_os: e("RUNNER_OS"),
     runner_arch: e("RUNNER_ARCH"),
+    runner_cpus: Number.isInteger(cpus) && cpus > 0 ? cpus : void 0,
     agent_version: agentVersion
   };
 }
